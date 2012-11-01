@@ -118,7 +118,12 @@ static DEFINE_MUTEX(dbs_mutex);
 
 static struct workqueue_struct *input_wq;
 
-static DEFINE_PER_CPU(struct work_struct, dbs_refresh_work);
+struct dbs_work_struct {
+	struct work_struct work;
+	unsigned int cpu;
+};
+
+static DEFINE_PER_CPU(struct dbs_work_struct, dbs_refresh_work);
 
 struct dbs_sync_work_struct {
 	struct work_struct work;
@@ -981,11 +986,15 @@ static int should_io_be_busy(void)
 	return 0;
 }
 
-static void dbs_refresh_callback(struct work_struct *unused)
+static void dbs_refresh_callback(struct work_struct *work)
 {
 	struct cpufreq_policy *policy;
 	struct cpu_dbs_info_s *this_dbs_info;
-	unsigned int cpu = smp_processor_id();
+	struct dbs_work_struct *dbs_work;
+	unsigned int cpu;
+
+	dbs_work = container_of(work, struct dbs_work_struct, work);
+	cpu = dbs_work->cpu;
 
 	get_online_cpus();
 
@@ -1121,8 +1130,8 @@ static void dbs_input_event(struct input_handle *handle, unsigned int type,
 		return;
 	}
 
-	for_each_online_cpu(i) {
-		dbs_info = &per_cpu(od_cpu_dbs_info, i);
+	for_each_online_cpu(i)
+		queue_work_on(i, input_wq, &per_cpu(dbs_refresh_work, i).work);
 
 		if (!dbs_info->cur_policy) {
 			pr_err("Dbs policy is NULL\n");
@@ -1346,16 +1355,12 @@ static int __init cpufreq_gov_dbs_init(void)
 	for_each_possible_cpu(i) {
 		struct cpu_dbs_info_s *this_dbs_info =
 			&per_cpu(od_cpu_dbs_info, i);
-                struct dbs_sync_work_struct *dbs_sync =
-                        &per_cpu(dbs_sync_work, i);
+		struct dbs_work_struct *dbs_work =
+			&per_cpu(dbs_refresh_work, i);
 
 		mutex_init(&this_dbs_info->timer_mutex);
-		INIT_WORK(&per_cpu(dbs_refresh_work, i), dbs_refresh_callback);
-
-		INIT_WORK(&dbs_sync->work, dbs_synchronize);
-		dbs_sync->src_cpu = 0;
-		dbs_sync->targ_cpu = i;
-
+		INIT_WORK(&dbs_work->work, dbs_refresh_callback);
+		dbs_work->cpu = i;
 	}
 
 	return cpufreq_register_governor(&cpufreq_gov_ondemand);
