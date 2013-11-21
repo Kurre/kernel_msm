@@ -11,9 +11,9 @@ NEWVERSION=$(expr $VERSION + 1)
 
 # Exports all the needed things Arch, SubArch and Cross Compile
 export ARCH=arm
-echo 'exporting Arch'
+echo 'exporting Arch...'
 export SUBARCH=arm
-echo 'exporting SubArch'
+echo 'exporting SubArch...'
 
 ##GCC 4.8
 #export CROSS_COMPILE=/media/dev/android-ndk-r9/toolchains/arm-linux-androideabi-4.8/prebuilt/linux-x86_64/bin/arm-linux-androideabi-
@@ -31,38 +31,34 @@ echo 'exporting Cross Compile'
 
 # Generates a new .config and exists
 if [ "$1" = "config" ] ; then
-	echo 'Making defconfig for Manta'
-	make slim_manta_defconfig
+	echo 'Make defconfig...'
+	make krnl_defconfig
 	exit
 fi
 
 # Generates a new .config and exists
 if [ "$1" = "menuconfig" ] ; then
-	echo 'Making defconfig for Manta and launching menuconfig'
-	make slim_manta_defconfig
+	echo 'Make defconfig and launch menuconfig...'
+	make krnl_defconfig
 	make menuconfig
-	cp .config arch/arm/configs/slim_manta_defconfig
+	cp .config arch/arm/configs/krnl_defconfig
 	exit
 fi
-
-# Exports kernel local version? Not sure yet.
-#echo 'Exporting kernel version'
-#export LOCALVERSION='SlimTest_1.0'
 
 #Let's check if $1 is a number
 re='^[0-9]+$'
 if [[ $1 =~ $re ]] ; then
 	# Lets go!
-	echo 'Lets start!'
+	echo 'Lets go!'
 
 	# Make sure build is clean!
-	echo "Removing old zImage"
+	echo "Remove old zImage..."
 	rm -f arch/arm/boot/zImage
-	echo 'Cleaning build'
+	echo 'Cleaning...'
 	make clean
 
 	#make -j$1
-	make -j$1 V=99 2>&1 |tee build-r$NEWVERSION.log
+	make -j$1 V=99 2>&1 |tee r${NEWVERSION}-build.log
 else
 	echo "Insert proper argument!"
 fi
